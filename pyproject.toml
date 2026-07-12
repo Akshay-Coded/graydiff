@@ -5,6 +5,7 @@ description = "Differentiable Gray-Scott surrogate for inverse design of reactio
 requires-python = ">=3.11"
 dependencies = [
     "numpy",
+    "scipy",
     "torch",
     "matplotlib",
     "tqdm",

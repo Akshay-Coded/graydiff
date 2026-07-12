@@ -11,11 +11,14 @@ data/raw/*
 !data/raw/.gitkeep
 data/phase_diagram_cache/*
 !data/phase_diagram_cache/.gitkeep
+!data/phase_diagram_cache/phase_diagram.json
 
 models/checkpoints/*
 !models/checkpoints/.gitkeep
 
 figures/*
 !figures/.gitkeep
+!figures/00_phase_diagram_thumbnails.png
+!figures/00_phase_diagram_classified.png
 
 node_modules/
