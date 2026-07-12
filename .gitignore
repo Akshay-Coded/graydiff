@@ -16,9 +16,6 @@ data/phase_diagram_cache/*
 models/checkpoints/*
 !models/checkpoints/.gitkeep
 
-figures/*
-!figures/.gitkeep
-!figures/00_phase_diagram_thumbnails.png
-!figures/00_phase_diagram_classified.png
+# figures/ PNGs are small and document the notebooks -- tracked by default
 
 node_modules/
