@@ -1,0 +1,30 @@
+[project]
+name = "graydiff"
+version = "0.1.0"
+description = "Differentiable Gray-Scott surrogate for inverse design of reaction-diffusion physics"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "torch",
+    "matplotlib",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+notebook = ["jupyterlab", "ipykernel", "plotly"]
+export = ["onnx", "onnxruntime"]
+web = ["fastapi", "uvicorn[standard]", "python-multipart"]
+dev = ["pytest", "pytest-cov", "ruff"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/graydiff"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: long-running tests (deselect with -m 'not slow')",
+]
