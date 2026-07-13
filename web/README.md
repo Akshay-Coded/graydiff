@@ -1,5 +1,8 @@
 # Running the web app locally
 
+**Live frontend:** https://akshay-coded.github.io/graydiff/ (backend not deployed yet — see
+[Deployment](../README.md#deployment) in the root README).
+
 Two independent local servers — no build step for either.
 
 ## 1. Backend (needed for "Solve for physics")
