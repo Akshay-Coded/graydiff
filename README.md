@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/readme/banner_phase_diagram.png" alt="Gray-Scott phase diagram: the same two numbers, F and k, produce spots, stripes, mazes, or nothing at all" width="620" />
+<img src="assets/readme/banner.png" alt="Differentiable Gray-Scott Inverse Design — draw the pattern you want, a neural surrogate finds the physics that makes it. Banner shows real Gray-Scott patterns: spots, mazes, stripes, and more." width="900" />
 
 # Differentiable Gray-Scott Inverse Design
 
