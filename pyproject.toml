@@ -13,7 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 notebook = ["jupyterlab", "ipykernel", "plotly"]
-export = ["onnx", "onnxruntime"]
+export = ["onnx", "onnxruntime", "onnxscript"]
 web = ["fastapi", "uvicorn[standard]", "python-multipart"]
 dev = ["pytest", "pytest-cov", "ruff"]
 
