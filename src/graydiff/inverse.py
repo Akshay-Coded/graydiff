@@ -105,8 +105,9 @@ def grid_search(
     (F, k) and return the best point — a cheap, robust starting region for
     the gradient refinement that follows."""
     model.eval()
-    F_vals = torch.linspace(*F_range, n_grid)
-    k_vals = torch.linspace(*k_range, n_grid)
+    device = seed_state.device
+    F_vals = torch.linspace(*F_range, n_grid, device=device)
+    k_vals = torch.linspace(*k_range, n_grid, device=device)
     best_loss = float("inf")
     best = (float(F_vals.mean()), float(k_vals.mean()))
     with torch.no_grad():
@@ -154,8 +155,9 @@ def inverse_design(
     if F_init is None or k_init is None:
         F_init, k_init = grid_search(model, target, seed_state, F_range, k_range, n_grid=grid_n, n_steps=n_steps)
 
-    F_val = torch.tensor([F_init], dtype=torch.float32, requires_grad=True)
-    k_val = torch.tensor([k_init], dtype=torch.float32, requires_grad=True)
+    device = seed_state.device
+    F_val = torch.tensor([F_init], dtype=torch.float32, requires_grad=True, device=device)
+    k_val = torch.tensor([k_init], dtype=torch.float32, requires_grad=True, device=device)
     optimizer = torch.optim.Adam([F_val, k_val], lr=lr)
 
     result = InverseResult(F=F_init, k=k_init)
@@ -194,10 +196,17 @@ def multi_start_inverse_design(
     """Run inverse_design from several starting points and keep the best
     (lowest final loss) — the spec's cheap, honest fix for the (F,k) loss
     landscape's local minima, since there are only two parameters to
-    restart. One grid search locates a promising region; the remaining
-    starts jitter around it so gradient descent explores its neighborhood
-    from slightly different points rather than repeating the identical
-    optimization trajectory `n_starts` times.
+    restart. One grid search locates a promising region; about half the
+    remaining starts jitter around it (refining that region), and the rest
+    are drawn uniformly at random across the full (F, k) range.
+
+    The random starts matter, not just the jittered ones: a single grid
+    search can itself land on a misleading point (found empirically —
+    Gray-Scott's "dead"/uniform corner of phase space can look deceptively
+    low-loss to this loss function at short rollout horizons, pulling a
+    purely-local search toward the phase-space boundary). If every start
+    only jitters around that one grid optimum, all of them inherit its
+    mistake instead of the multi-start actually offering a second opinion.
     """
     if rng is None:
         rng = np.random.default_rng()
@@ -206,11 +215,14 @@ def multi_start_inverse_design(
     n_steps = inverse_design_kwargs.get("n_steps", 80)
     F0, k0 = grid_search(model, target, seed_state, F_range, k_range, n_grid=grid_n, n_steps=n_steps)
 
+    n_jittered = max(1, (n_starts + 1) // 2)
     starts = [(F0, k0)]
-    for _ in range(n_starts - 1):
+    for _ in range(n_jittered - 1):
         F_j = float(np.clip(F0 + rng.normal(0, jitter), *F_range))
         k_j = float(np.clip(k0 + rng.normal(0, jitter), *k_range))
         starts.append((F_j, k_j))
+    for _ in range(n_starts - n_jittered):
+        starts.append((float(rng.uniform(*F_range)), float(rng.uniform(*k_range))))
 
     results = [
         inverse_design(
