@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Differentiable Gray-Scott — Inverse Design</title>
+<link rel="stylesheet" href="style.css" />
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+</head>
+<body>
+
+<header>
+  <h1>Inverse Design with a Differentiable Physics Surrogate</h1>
+  <p class="subtitle">
+    Draw the pattern you want. A neural surrogate for the Gray-Scott reaction-diffusion PDE —
+    trained to be differentiable in its physics parameters (F, k) — runs backwards through
+    gradient descent to find the physics that makes it. The classical solver cannot do this at
+    any speed, because it has no gradients to offer.
+  </p>
+</header>
+
+<main>
+
+  <section id="playground" class="panel">
+    <h2>Forward Playground <span class="tag">runs entirely in your browser via ONNX</span></h2>
+    <p class="hint">Click/drag on the grid to paint a seed. Adjust F and k, then Play.</p>
+    <div class="playground-layout">
+      <canvas id="playground-canvas" width="256" height="256"></canvas>
+      <div class="controls">
+        <label>F (feed rate): <span id="pf-val">0.035</span>
+          <input type="range" id="pf-slider" min="0.020" max="0.070" step="0.001" value="0.035" />
+        </label>
+        <label>k (kill rate): <span id="pk-val">0.065</span>
+          <input type="range" id="pk-slider" min="0.050" max="0.070" step="0.001" value="0.065" />
+        </label>
+        <div class="button-row">
+          <button id="play-btn">Play</button>
+          <button id="pause-btn" disabled>Pause</button>
+          <button id="reset-btn">Reset seed</button>
+        </div>
+        <div class="button-row preset-row" id="preset-buttons"></div>
+        <p class="status" id="playground-status">Loading model…</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="inverse" class="panel">
+    <h2>Solve for Physics <span class="tag">calls a small backend — needs backprop</span></h2>
+    <p class="hint">Draw the pattern you want on the left, then click "Solve for physics".</p>
+    <div class="inverse-layout">
+      <div>
+        <canvas id="draw-canvas" width="200" height="200"></canvas>
+        <div class="button-row">
+          <button id="clear-draw-btn">Clear</button>
+          <button id="solve-btn">Solve for physics</button>
+        </div>
+        <p class="status" id="solve-status"></p>
+      </div>
+      <div id="phase-diagram-wrap">
+        <canvas id="phase-diagram-canvas" width="300" height="260"></canvas>
+      </div>
+      <div id="loss-chart-wrap">
+        <canvas id="loss-chart-canvas" width="300" height="260"></canvas>
+      </div>
+    </div>
+
+    <div id="result-panel" class="result-panel hidden">
+      <h3>Result</h3>
+      <p id="result-summary"></p>
+      <div class="result-fields">
+        <div><canvas class="field-canvas" id="result-target" width="150" height="150"></canvas><p>target</p></div>
+        <div><canvas class="field-canvas" id="result-surrogate" width="150" height="150"></canvas><p>surrogate @ recovered (F,k)</p></div>
+        <div><canvas class="field-canvas" id="result-solver" width="150" height="150"></canvas><p>REAL SOLVER @ recovered (F,k)</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="about" class="panel">
+    <h2>About this result</h2>
+    <p>
+      This project trained a neural surrogate to imitate a NumPy Gray-Scott solver, validated
+      that it reproduces the correct Turing-pattern regimes across a bounded rollout horizon
+      (not indefinitely — see the project notebooks for the honestly-measured stability window),
+      then used backpropagation through the frozen, differentiable surrogate to solve the
+      inverse problem: given a drawn pattern, recover the physics parameters that produce it.
+      Every recovered result shown here is independently re-verified against the real NumPy
+      solver, server-side — never graded only against the surrogate's own output.
+    </p>
+    <p>
+      Full build notebooks (00–06), the ground-truth recovery experiment with a measured
+      recovery error, and an explicit failure-mode gallery (including cases where this doesn't
+      work well) are in <code>notebooks/</code> in the project repository.
+    </p>
+  </section>
+
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
