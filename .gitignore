@@ -16,6 +16,7 @@ data/phase_diagram_cache/*
 
 models/checkpoints/*
 !models/checkpoints/.gitkeep
+!models/checkpoints/surrogate_rollout.pt
 
 # figures/ PNGs are small and document the notebooks -- tracked by default
 
