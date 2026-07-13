@@ -39,3 +39,22 @@ class PhaseDiagramResponse(BaseModel):
     k_values: list[float]
     labels: list[list[str]]
     solver_steps_per_sec: float
+
+
+class ForwardSolveRequest(BaseModel):
+    F: float
+    k: float
+    n_steps: int = Field(6000, ge=100, le=12000, description="Real solver has no stability ceiling, unlike the surrogate")
+
+
+class ForwardSolveSnapshot(BaseModel):
+    step: int
+    field: list[list[float]]
+
+
+class ForwardSolveResponse(BaseModel):
+    final_field: list[list[float]]
+    snapshots: list[ForwardSolveSnapshot]
+    n_steps: int
+    regime: str
+    elapsed_seconds: float

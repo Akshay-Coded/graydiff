@@ -102,6 +102,33 @@ button.secondary { background: transparent; border: 1px solid var(--border); col
 
 #phase-diagram-wrap, #loss-chart-wrap { flex: 1; min-width: 260px; }
 
+.controls select, .controls input[type="number"] {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.realsolve-wrap {
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+.realsolve-wrap h3 { font-size: 0.95rem; margin: 0 0 0.3rem; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+.realsolve-wrap input[type="number"] { width: 5.5rem; }
+
+.snapshot-strip {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+.snapshot-strip figure { margin: 0; text-align: center; }
+.snapshot-strip canvas { width: 96px; height: 96px; }
+.snapshot-strip figcaption { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
+
 .result-panel { margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem; }
 .result-panel.hidden { display: none; }
 .result-fields { display: flex; gap: 1rem; flex-wrap: wrap; }

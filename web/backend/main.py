@@ -1,8 +1,14 @@
-"""FastAPI backend: the one part of this project that has to run server-side.
+"""FastAPI backend for the two things the static frontend can't do itself.
 
-Everything else (the forward playground) runs client-side via ONNX in the
-browser -- see web/frontend/. This service exists only because the inverse
-design optimization needs PyTorch backprop, which onnxruntime-web cannot do.
+The forward PLAYGROUND runs client-side via ONNX in the browser -- see
+web/frontend/ -- for short, real-time rollouts. This service covers the two
+cases that need to run server-side instead:
+  - /inverse-design needs PyTorch backprop, which onnxruntime-web cannot do.
+  - /forward-solve runs the REAL solver for a long rollout, since the ONNX
+    surrogate's own accuracy ceiling (~1,000-1,500 steps, see notebook 04)
+    is well short of what a fully-formed pattern needs (thousands of steps,
+    see notebook 00) -- the real solver has no such ceiling and is fast
+    enough to run on demand.
 
 Run from the repo root:
     uv run uvicorn web.backend.main:app --reload --port 8001
@@ -14,7 +20,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from web.backend.model_state import get_model
-from web.backend.routers import inverse, phase_diagram
+from web.backend.routers import forward, inverse, phase_diagram
 
 app = FastAPI(title="graydiff inverse-design API")
 
@@ -30,6 +36,7 @@ app.add_middleware(
 
 app.include_router(inverse.router)
 app.include_router(phase_diagram.router)
+app.include_router(forward.router)
 
 
 @app.on_event("startup")

@@ -22,8 +22,13 @@
 <main>
 
   <section id="playground" class="panel">
-    <h2>Forward Playground <span class="tag">runs entirely in your browser via ONNX</span></h2>
-    <p class="hint">Click/drag on the grid to paint a seed. Adjust F and k, then Play.</p>
+    <h2>Forward Playground <span class="tag">the ML surrogate — runs entirely in your browser via ONNX</span></h2>
+    <p class="hint">
+      Click/drag on the grid to paint a seed. Adjust F and k, then Play.
+      This is the trained neural surrogate, not the real solver — it stays accurate for roughly
+      the first 1,000–1,500 steps, then degrades into an unphysical artifact (a known, documented
+      limitation — see "Run the real solver" below to see genuine fully-formed patterns instead).
+    </p>
     <div class="playground-layout">
       <canvas id="playground-canvas" width="256" height="256"></canvas>
       <div class="controls">
@@ -33,6 +38,14 @@
         <label>k (kill rate): <span id="pk-val">0.065</span>
           <input type="range" id="pk-slider" min="0.050" max="0.070" step="0.001" value="0.065" />
         </label>
+        <label>Speed:
+          <select id="speed-select">
+            <option value="1">1x (1 step/frame)</option>
+            <option value="10" selected>10x</option>
+            <option value="50">50x</option>
+            <option value="200">200x (jumps fast — watch the step counter)</option>
+          </select>
+        </label>
         <div class="button-row">
           <button id="play-btn">Play</button>
           <button id="pause-btn" disabled>Pause</button>
@@ -40,7 +53,23 @@
         </div>
         <div class="button-row preset-row" id="preset-buttons"></div>
         <p class="status" id="playground-status">Loading model…</p>
+        <p class="status" id="step-counter">step 0</p>
       </div>
+    </div>
+
+    <div class="realsolve-wrap">
+      <h3>Run the real solver <span class="tag">server-side, no accuracy ceiling</span></h3>
+      <p class="hint">
+        Runs the actual NumPy Gray-Scott solver at the F/k above, for as many steps as it takes
+        to fully form — the real solver has no breakdown point, unlike the surrogate. Typically
+        under a second server-side even for 8,000+ steps.
+      </p>
+      <div class="button-row">
+        <label>steps: <input type="number" id="real-steps-input" value="8000" min="500" max="12000" step="500" /></label>
+        <button id="real-solve-btn">Run real solver</button>
+      </div>
+      <p class="status" id="real-solve-status"></p>
+      <div id="real-solve-snapshots" class="snapshot-strip"></div>
     </div>
   </section>
 

@@ -41,9 +41,11 @@ async function initPlayground() {
   const pkSlider = document.getElementById("pk-slider");
   const pfVal = document.getElementById("pf-val");
   const pkVal = document.getElementById("pk-val");
+  const speedSelect = document.getElementById("speed-select");
   const playBtn = document.getElementById("play-btn");
   const pauseBtn = document.getElementById("pause-btn");
   const resetBtn = document.getElementById("reset-btn");
+  const stepCounterEl = document.getElementById("step-counter");
 
   let session;
   try {
@@ -57,13 +59,25 @@ async function initPlayground() {
 
   let { U, V } = standardSeed();
   let playing = false;
+  let stepCount = 0;
+
+  // Ceiling documented in notebook 04: trajectory-tracking against the real
+  // solver held under threshold for ~425-600 steps in testing, and the
+  // long-horizon collapse (spurious, F/k-independent striping) sets in by
+  // roughly 2000 steps. Flag it in the UI rather than letting it surprise you.
+  const CEILING_WARN_STEP = 1000;
+  const CEILING_HARD_STEP = 2000;
 
   function render() {
     drawField(canvas, to2D(V), { vmin: 0, vmax: 1 });
+    let note = "";
+    if (stepCount >= CEILING_HARD_STEP) note = " — past the documented breakdown point; this is the known noise artifact, not real physics";
+    else if (stepCount >= CEILING_WARN_STEP) note = " — approaching the surrogate's documented accuracy ceiling (~1000-1500 steps)";
+    stepCounterEl.textContent = `step ${stepCount}${note}`;
   }
   render();
 
-  async function step() {
+  async function computeStep() {
     const F = parseFloat(pfSlider.value);
     const k = parseFloat(pkSlider.value);
     const Fgrid = new Float32Array(GRID * GRID).fill(F);
@@ -79,12 +93,16 @@ async function initPlayground() {
     const outData = out.output.data;
     U = outData.slice(0, GRID * GRID);
     V = outData.slice(GRID * GRID, 2 * GRID * GRID);
-    render();
+    stepCount += 1;
   }
 
   async function loop() {
     if (!playing) return;
-    await step();
+    const stepsPerFrame = parseInt(speedSelect.value, 10);
+    for (let i = 0; i < stepsPerFrame; i++) {
+      await computeStep();
+    }
+    render();
     requestAnimationFrame(loop);
   }
 
@@ -101,6 +119,7 @@ async function initPlayground() {
   });
   resetBtn.addEventListener("click", () => {
     ({ U, V } = standardSeed());
+    stepCount = 0;
     render();
   });
 
@@ -136,6 +155,7 @@ async function initPlayground() {
         pfSlider.value = p.F; pkSlider.value = p.k;
         pfVal.textContent = p.F.toFixed(3); pkVal.textContent = p.k.toFixed(3);
         ({ U, V } = standardSeed());
+        stepCount = 0;
         render();
       });
       wrap.appendChild(btn);
@@ -143,6 +163,61 @@ async function initPlayground() {
   } catch (err) {
     console.warn("Could not load presets.json", err);
   }
+
+  // "Run the real solver": server-side, no accuracy ceiling -- this is what
+  // actually shows a fully-formed spots/stripes/maze pattern, since the
+  // ONNX surrogate above physically cannot reach one (see the hint text).
+  const realStatusEl = document.getElementById("real-solve-status");
+  const realStepsInput = document.getElementById("real-steps-input");
+  const realSolveBtn = document.getElementById("real-solve-btn");
+  const snapshotStrip = document.getElementById("real-solve-snapshots");
+
+  realSolveBtn.addEventListener("click", async () => {
+    const F = parseFloat(pfSlider.value);
+    const k = parseFloat(pkSlider.value);
+    const n_steps = parseInt(realStepsInput.value, 10);
+    realStatusEl.textContent = "Running the real solver…";
+    realSolveBtn.disabled = true;
+    snapshotStrip.innerHTML = "";
+    try {
+      const res = await fetch(`${BACKEND_URL}/forward-solve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ F, k, n_steps }),
+      });
+      if (!res.ok) throw new Error(`backend returned ${res.status}`);
+      const result = await res.json();
+
+      realStatusEl.textContent =
+        `Solved ${result.n_steps} real steps in ${result.elapsed_seconds.toFixed(2)}s -- final pattern classified as "${result.regime}".`;
+
+      for (const snap of result.snapshots) {
+        const fig = document.createElement("figure");
+        const c = document.createElement("canvas");
+        c.width = GRID; c.height = GRID;
+        fig.appendChild(c);
+        const cap = document.createElement("figcaption");
+        cap.textContent = `step ${snap.step}`;
+        fig.appendChild(cap);
+        snapshotStrip.appendChild(fig);
+        drawField(c, snap.field, { vmin: 0, vmax: 1 });
+      }
+      const finalFig = document.createElement("figure");
+      const finalCanvas = document.createElement("canvas");
+      finalCanvas.width = GRID; finalCanvas.height = GRID;
+      finalFig.appendChild(finalCanvas);
+      const finalCap = document.createElement("figcaption");
+      finalCap.textContent = `step ${result.n_steps} (final, "${result.regime}")`;
+      finalFig.appendChild(finalCap);
+      snapshotStrip.appendChild(finalFig);
+      drawField(finalCanvas, result.final_field, { vmin: 0, vmax: 1 });
+    } catch (err) {
+      console.error(err);
+      realStatusEl.textContent = `Failed to reach the backend at ${BACKEND_URL} (is it running?). ${err}`;
+    } finally {
+      realSolveBtn.disabled = false;
+    }
+  });
 }
 
 // ------------------------------------------------------------- loss chart
