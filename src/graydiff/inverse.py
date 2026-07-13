@@ -41,6 +41,7 @@ from torch.utils.checkpoint import checkpoint
 
 from graydiff.constants import DEFAULT_GRID_SIZE, F_RANGE, K_RANGE
 from graydiff.losses import pattern_loss
+from graydiff.metrics import STATE_CLAMP_RANGE
 from graydiff.model import make_input
 from graydiff.solver import standard_seed
 
@@ -62,15 +63,29 @@ def rollout_surrogate(
     seed_state: torch.Tensor,
     n_steps: int,
     use_checkpoint: bool = False,
+    clamp_range: tuple[float, float] | None = STATE_CLAMP_RANGE,
 ) -> torch.Tensor:
     """Differentiable forward rollout: n_steps of the FROZEN surrogate,
     starting from seed_state, with F_val/k_val re-broadcast into the input
     at every step. Gradients flow from the returned state all the way back
-    to F_val and k_val through the entire unroll."""
+    to F_val and k_val through the entire unroll.
+
+    `clamp_range` applies the same physically-motivated numerical safety net
+    as graydiff.metrics.surrogate_rollout_trajectory (see that module for the
+    full rationale) — torch.clamp is differentiable, so this stays compatible
+    with backprop to F_val/k_val. With n_steps kept inside the surrogate's
+    measured stable horizon (notebook 04), as every default in this module
+    already is, the clamp should rarely if ever actually engage; it exists to
+    keep an occasional wayward grid-search or early-optimization point from
+    producing NaN/Inf instead of a large-but-finite loss.
+    """
     state = seed_state
 
     def step(s: torch.Tensor) -> torch.Tensor:
-        return model(make_input(s, F_val, k_val))
+        out = model(make_input(s, F_val, k_val))
+        if clamp_range is not None:
+            out = torch.clamp(out, *clamp_range)
+        return out
 
     for _ in range(n_steps):
         state = checkpoint(step, state, use_reentrant=False) if use_checkpoint else step(state)

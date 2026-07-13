@@ -9,11 +9,24 @@ for the inverse-design result later:
   model wrong edge physics.
 
   residual output — the state barely changes per step (confirmed empirically
-  in notebook 01: max |delta V| per step is small relative to V's [0,1]
-  range), so predicting the small delta and adding it to the input is far
-  easier and far more stable than predicting the whole next frame from
-  scratch. This single choice is what makes long autoregressive rollouts
-  (Phase 3/4) and long-rollout inverse-design optimization (Phase 5) stable.
+  in notebook 01: max |delta V| across the entire training set never
+  exceeds ~0.015), so predicting the small delta and adding it to the input
+  is far easier and far more stable than predicting the whole next frame
+  from scratch.
+
+  BOUNDED residual delta — notebook 04's first attempt at long autoregressive
+  rollouts revealed that an *unbounded* residual delta is not enough on its
+  own: fed its own output for hundreds of steps, the raw architecture above
+  drifted onto inputs unlike anything in training and started emitting large,
+  runaway per-step corrections there, diverging exponentially within a few
+  hundred steps. Because the true physical per-step change is always small
+  (empirically bounded, see above), the delta is passed through a
+  `delta_scale * tanh(...)` before being added — a hard, physically-motivated
+  cap on how much the state can change in one step, chosen generously above
+  the observed data (see DEFAULT_DELTA_SCALE below) so it doesn't constrain
+  normal dynamics, but making runaway exponential growth mathematically
+  impossible: each step can move the state by at most `delta_scale`,
+  regardless of what the input looks like.
 
   (F, k) as input channels — broadcasting the two scalar physics parameters
   to full grids and concatenating them with (U, V) is the thing that makes
@@ -29,6 +42,13 @@ import torch.nn.functional as F
 
 N_INPUT_CHANNELS = 4  # U, V, F_grid, k_grid
 N_OUTPUT_CHANNELS = 2  # U_next, V_next
+
+# The largest per-step |delta V| observed anywhere in the generated training
+# set (graydiff.data) is ~0.015. This default is set well above that (~13x)
+# so the cap doesn't bind during normal dynamics, while still making runaway
+# per-step growth mathematically impossible during long autoregressive
+# rollouts (notebook 04).
+DEFAULT_DELTA_SCALE = 0.2
 
 
 class CircularConv2d(nn.Module):
@@ -59,8 +79,9 @@ class Surrogate(nn.Module):
     Output: [B, 2, H, W] = (U_next, V_next)
     """
 
-    def __init__(self, hidden: int = 64):
+    def __init__(self, hidden: int = 64, delta_scale: float = DEFAULT_DELTA_SCALE):
         super().__init__()
+        self.delta_scale = delta_scale
         self.net = nn.Sequential(
             CircularConv2d(N_INPUT_CHANNELS, hidden),
             nn.GELU(),
@@ -72,8 +93,11 @@ class Surrogate(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # residual: predict the DELTA, add it to the current (U, V)
-        return x[:, :N_OUTPUT_CHANNELS] + self.net(x)
+        # residual: predict a BOUNDED delta (see DEFAULT_DELTA_SCALE above),
+        # add it to the current (U, V). tanh(0) == 0, so an untrained
+        # (zero-init) network still reduces exactly to the identity map.
+        delta = self.delta_scale * torch.tanh(self.net(x))
+        return x[:, :N_OUTPUT_CHANNELS] + delta
 
 
 def make_input(state: torch.Tensor, F_val: torch.Tensor, k_val: torch.Tensor) -> torch.Tensor:

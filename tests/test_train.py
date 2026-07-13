@@ -7,7 +7,7 @@ from graydiff.train import train_rollout, train_single_step
 
 
 def _tiny_loaders():
-    config = GenerationConfig(n_runs=10, grid_size=12, warmup_steps=3, window_len=4, seed=0)
+    config = GenerationConfig(n_runs=10, grid_size=12, warmup_range=(0, 3), window_len=4, seed=0)
     data = generate_dataset(config)
     train_data, val_data = train_val_split_by_run(data, val_frac=0.3, seed=0)
     return train_data, val_data

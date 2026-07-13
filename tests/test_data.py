@@ -16,7 +16,7 @@ from graydiff.data import (
 @pytest.fixture
 def tiny_data():
     config = GenerationConfig(
-        n_runs=6, grid_size=16, warmup_steps=5, window_len=4, seed=0
+        n_runs=6, grid_size=16, warmup_range=(0, 5), window_len=4, seed=0
     )
     return generate_dataset(config), config
 
@@ -37,7 +37,7 @@ def test_generate_dataset_params_within_range(tiny_data):
 
 
 def test_generate_dataset_reproducible():
-    config = GenerationConfig(n_runs=3, grid_size=16, warmup_steps=5, window_len=3, seed=7)
+    config = GenerationConfig(n_runs=3, grid_size=16, warmup_range=(0, 5), window_len=3, seed=7)
     d1 = generate_dataset(config)
     d2 = generate_dataset(config)
     assert np.array_equal(d1["states"], d2["states"])

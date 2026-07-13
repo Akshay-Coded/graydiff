@@ -8,12 +8,25 @@ where that decision starts — every generated sample carries its own (F, k)
 alongside the state.
 
 Each run saves a short, CONTIGUOUS trajectory window (not an isolated
-single-step pair), after a warm-up period that lets the solver move past the
-raw initial blob into more representative mid-evolution dynamics. A window of
-`window_len + 1` consecutive solver states gives every single-step pair
-within it for free (Phase 3's warm-up training) AND every rollout length up
-to `window_len` as a sub-slice (Phase 3's multi-step rollout training) —
-one generation pass serves both training regimes.
+single-step pair), starting after a RANDOMIZED warm-up period (sampled per
+run from `warmup_range`, which includes 0). A window of `window_len + 1`
+consecutive solver states gives every single-step pair within it for free
+(Phase 3's warm-up training) AND every rollout length up to `window_len` as
+a sub-slice (Phase 3's multi-step rollout training) — one generation pass
+serves both training regimes.
+
+The warm-up is randomized, not fixed, for a reason discovered the hard way
+(see notebook 04): every downstream use of the trained surrogate — the
+phase-diagram-match validation, the inverse-design optimization — starts its
+own rollout from `graydiff.solver.standard_seed()` at t=0, i.e. from the RAW,
+freshly-nucleating initial blob. A first version of this module always used
+a FIXED warmup_steps=2000, so every training window started well past
+nucleation and the model never saw t=0-ish dynamics at all during training —
+a real train/inference distribution mismatch that manifested as immediate,
+(F,k)-independent high-frequency noise the moment the trained model was
+rolled out autoregressively from a fresh seed. Sampling the warmup per run
+from a range that includes 0 gives the model broad exposure to every stage
+of the trajectory, nucleation included.
 """
 
 from __future__ import annotations
@@ -33,7 +46,7 @@ from graydiff.solver import gray_scott_step, random_seed
 class GenerationConfig:
     n_runs: int = 2000
     grid_size: int = DEFAULT_GRID_SIZE
-    warmup_steps: int = 2000
+    warmup_range: tuple[int, int] = (0, 2000)
     window_len: int = 10  # states saved per run = window_len + 1
     Du: float = DU
     Dv: float = DV
@@ -44,8 +57,9 @@ class GenerationConfig:
 
 def generate_dataset(config: GenerationConfig) -> dict[str, np.ndarray]:
     """Run `config.n_runs` independent (F, k, random seed) rollouts. Each is
-    warmed up for `warmup_steps` then snapshotted over a contiguous window of
-    `window_len + 1` states.
+    warmed up for a RANDOM number of steps (sampled per run from
+    `warmup_range`, which includes 0 -- see module docstring) then
+    snapshotted over a contiguous window of `window_len + 1` states.
 
     Returns:
         states: [n_runs, window_len+1, 2, H, W] float32 (channel 0=U, 1=V)
@@ -62,7 +76,8 @@ def generate_dataset(config: GenerationConfig) -> dict[str, np.ndarray]:
         F = float(rng.uniform(*config.F_range))
         k = float(rng.uniform(*config.k_range))
         U, V = random_seed(H, W, rng=rng)
-        for _ in range(config.warmup_steps):
+        warmup_steps = int(rng.integers(config.warmup_range[0], config.warmup_range[1] + 1))
+        for _ in range(warmup_steps):
             U, V = gray_scott_step(U, V, Du=config.Du, Dv=config.Dv, F=F, k=k)
         for t in range(n_states):
             states[i, t, 0] = U
